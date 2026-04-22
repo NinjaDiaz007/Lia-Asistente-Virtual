@@ -1,6 +1,18 @@
 import os
 import subprocess
 import random
+import unicodedata
+
+# ------------------ CONFIG ------------------
+HOME = os.path.expanduser("~")
+RUTA_MUSICA = os.path.join(HOME, "Música")
+FORMATOS_AUDIO = (".mp3", ".wav", ".flac", ".ogg")
+
+# ------------------ NORMALIZAR TEXTO ------------------
+def limpiar(texto):
+    texto = texto.lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', texto)
+                   if unicodedata.category(c) != 'Mn')
 
 # ------------------ MÓDULO DE CHISTES ------------------
 def obtener_chiste():
@@ -9,84 +21,129 @@ def obtener_chiste():
         "¿Qué hace una abeja en el gimnasio? Zum-ba.",
         "¿Por qué los programadores confunden Halloween y Navidad? Porque OCT 31 es igual a DEC 25.",
         "¿Cuál es el café más peligroso? El ex-preso.",
-        "¿Por qué el libro de matemáticas estaba triste? Porque tenía muchos problemas."
+        "¿Qué hace un mudo bailando? Una mudanza.",
+        "¿Por qué los espejos no utilizan WhatsApp? Porque se reflejan en el pasado."
     ]
     return random.choice(chistes)
 
+# ------------------ HABLAR ------------------
+def hablar(texto):
+    subprocess.run([
+        "pico2wave", "-l=es-ES", "-w=temp.wav", texto
+    ])
+    os.system("aplay temp.wav")
+
+# ------------------ ABRIR APP ------------------
+def abrir_app(comando):
+    subprocess.Popen(
+        comando,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+
+# ------------------ EXPLORADOR INTELIGENTE ------------------
+def abrir_explorador(carpeta=""):
+    rutas = {
+        "descargas": "Descargas",
+        "documentos": "Documentos",
+        "musica": "Música",
+        "videos": "Videos",
+        "imagenes": "Imágenes"
+    }
+
+    if carpeta == "":
+        destino = HOME
+    else:
+        carpeta = limpiar(carpeta)
+        destino = os.path.join(HOME, rutas.get(carpeta, carpeta))
+
+    abrir_app(["xdg-open", destino])
+    return f"Abriendo {carpeta if carpeta else 'inicio'}"
+
+# ------------------ MÚSICA ------------------
+def reproducir_todo():
+    try:
+        archivos = [
+            os.path.join(RUTA_MUSICA, f)
+            for f in os.listdir(RUTA_MUSICA)
+            if f.lower().endswith(FORMATOS_AUDIO)
+        ]
+
+        if not archivos:
+            return "No hay música"
+
+        abrir_app(["cvlc"] + archivos)
+        return "Reproduciendo toda tu música"
+    except:
+        return "Error al reproducir música"
 
 # ------------------ RESPUESTAS ------------------
 respuestas = {
     "hola": "Hola, ¿cómo has estado?",
     "bien": "Me alegra mucho escuchar eso",
     "mal": "Lo siento, espero que mejores",
-    "adios": "Que tenga un buen día",
-    "salir": "Hasta luego",
-    "firefox": "Abriendo el navegador Firefox",
-    "code": "Abriendo el editor de código",
-    "vscode": "Abriendo el editor de código",
-    "vlc": "Abriendo el reproductor de musica",
-    "sublimetext": "Abriendo el editor de código",
-    "cierra code": "Cerrando el editor de código",
-    "cierra sublimetext": "Cerrando el editor de código",
-    "cierra firefox": "Cerrando el navegador mozila",
-    "cierra vlc": "Cerrando el reproductor de musica",
-    "quien eres":"Soy una asistete virtual que te puede ayudar en realizar ciertas tareas sencillas hasta que tenga mas acciones que en futuras verciones"
+    "quien eres": "Soy tu asistente tipo Jarvis, listo para ayudarte",
+    "adios": "Hasta luego",
+    "salir": "Hasta luego"
 }
-
-lia = ""
-
-# ------------------ HABLAR ------------------
-def hablar(texto):
-    subprocess.run([
-        "pico2wave",
-        "-l=es-ES",
-        "-w=temp.wav",
-        texto
-    ])
-    os.system("aplay temp.wav")
 
 # ------------------ LOOP ------------------
 while True:
-    entrada = input("Adm: ").lower()
+    entrada = input("Adm: ")
+    cmd = limpiar(entrada)
 
     # -------- CHISTE --------
-    if entrada == "chiste":
+    if "chiste" in cmd:
         hablar(obtener_chiste())
 
-    # -------- RESPUESTAS NORMALES --------
-    elif entrada in respuestas:
-        hablar(respuestas[entrada])
+    # -------- ABRIR APPS --------
+    elif "firefox" in cmd and "cierra" not in cmd:
+        hablar("Abriendo Firefox")
+        abrir_app(["firefox"])
+
+    elif "code" == cmd:
+        hablar("Abriendo VS Code")
+        abrir_app(["code"])
+
+    elif "vlc" == cmd:
+        hablar("Abriendo VLC")
+        abrir_app(["vlc"])
+
+    elif "explorador" in cmd:
+        hablar(abrir_explorador())
+
+    elif "abrir carpeta" in cmd:
+        carpeta = cmd.replace("abrir carpeta", "").strip()
+        hablar(abrir_explorador(carpeta))
+
+    # -------- MÚSICA --------
+    elif "reproducir todo" in cmd:
+        hablar(reproducir_todo())
+
+    # -------- CERRAR --------
+    elif "cierra firefox" in cmd:
+        hablar("Cerrando Firefox")
+        abrir_app(["pkill", "-15", "firefox"])
+
+    elif "cierra vlc" in cmd:
+        hablar("Cerrando VLC")
+        abrir_app(["pkill", "-15", "vlc"])
+
+    elif "cierra explorador" in cmd:
+        hablar("Cerrando explorador")
+        abrir_app(["pkill", "-15", "nautilus"])
+
+    elif "cierra code" in cmd:
+        hablar("Cerrando VS Code")
+        abrir_app(["pkill", "-15", "code"])
+
+    # -------- RESPUESTAS --------
+    elif cmd in respuestas:
+        hablar(respuestas[cmd])
 
     else:
         hablar("No lo entiendo")
 
-    # -------- ACCIONES --------
-    if entrada == "firefox":
-        subprocess.Popen(["firefox"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-
-    if entrada == "cierra firefox":
-        subprocess.Popen(["pkill", "-15", "firefox"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    if entrada == "code" or entrada == "vscode":
-        os.system("code")
-
-    if entrada == "cierra code":
-        subprocess.run(["pkill", "code"])
-
-    if entrada == "sublimetext":
-        os.system("subl")
-
-    if entrada == "cierra sublimetext":
-        subprocess.run(["pkill", "subl"])
-
-    if entrada == "vlc":
-        subprocess.Popen(["vlc"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    if entrada == "cierra vlc":
-        subprocess.Popen(["pkill", "vlc"])
-
-    if entrada == "quien eres":
-        hablar(respuestas[entrada])
-
-    if entrada == "adios" or entrada == "salir":
+    if cmd in ["adios", "salir"]:
         break
